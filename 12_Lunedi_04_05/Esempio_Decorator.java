@@ -1,126 +1,151 @@
-public class Observer_J {
+public class Decorator_J {
 
     public static void main(String[] args) {
 
-        // Creo il soggetto osservabile
-        CanaleYoutube canale = new CanaleYoutube("Programmazione Java");
+        // =====================================================
+        // ESEMPIO BASE: CAFFÈ SEMPLICE
+        // =====================================================
 
-        // Creo gli osservatori
-        Iscritto iscritto1 = new Iscritto("Mario");
-        Iscritto iscritto2 = new Iscritto("Luisa");
-        Iscritto iscritto3 = new Iscritto("Giovanni");
+        Bevanda caffeBase = new Caffe();
 
-        // Gli osservatori si iscrivono al soggetto
-        canale.aggiungiOsservatore(iscritto1);
-        canale.aggiungiOsservatore(iscritto2);
-        canale.aggiungiOsservatore(iscritto3);
-
-        // Il soggetto cambia stato e avvisa tutti
-        canale.pubblicaVideo("Introduzione all'Observer Pattern");
+        System.out.println("Bevanda: " + caffeBase.descrizione());
+        System.out.println("Costo: " + caffeBase.costo() + " euro");
 
         System.out.println();
 
-        // Un osservatore si disiscrive
-        canale.rimuoviOsservatore(iscritto2);
+        // =====================================================
+        // DECORATOR 1: CAFFÈ CON LATTE
+        // =====================================================
 
-        // Il soggetto cambia di nuovo stato
-        canale.pubblicaVideo("Observer Pattern in Java");
+        Bevanda caffeConLatte = new Latte(new Caffe());
+
+        System.out.println("Bevanda: " + caffeConLatte.descrizione());
+        System.out.println("Costo: " + caffeConLatte.costo() + " euro");
+
+        System.out.println();
+
+        // =====================================================
+        // DECORATOR 2: CAFFÈ CON LATTE E CIOCCOLATO
+        // =====================================================
+
+        Bevanda caffeCompleto = new Cioccolato(new Latte(new Caffe()));
+
+        System.out.println("Bevanda: " + caffeCompleto.descrizione());
+        System.out.println("Costo: " + caffeCompleto.costo() + " euro");
+
+        System.out.println();
+
+        // =====================================================
+        // DECORATOR 3: CAFFÈ CON PIÙ DECORAZIONI
+        // =====================================================
+
+        Bevanda caffeSpeciale = new Panna(new Cioccolato(new Latte(new Caffe())));
+
+        System.out.println("Bevanda: " + caffeSpeciale.descrizione());
+        System.out.println("Costo: " + caffeSpeciale.costo() + " euro");
     }
 
     // =====================================================
-    // INTERFACCIA OSSERVATORE
+    // COMPONENTE BASE
     // =====================================================
 
-    interface Osservatore {
-        void aggiorna(String nomeCanale, String titoloVideo);
+    interface Bevanda {
+
+        String descrizione();
+
+        double costo();
     }
 
     // =====================================================
-    // INTERFACCIA SOGGETTO
+    // COMPONENTE CONCRETO
     // =====================================================
 
-    interface Soggetto {
-        void aggiungiOsservatore(Osservatore osservatore);
+    static class Caffe implements Bevanda {
 
-        void rimuoviOsservatore(Osservatore osservatore);
-
-        void notificaOsservatori();
-    }
-
-    // =====================================================
-    // CLASSE CONCRETA OSSERVATORE
-    // =====================================================
-
-    static class Iscritto implements Osservatore {
-
-        String nome;
-
-        public Iscritto(String nome) {
-            this.nome = nome;
+        @Override
+        public String descrizione() {
+            return "Caffè";
         }
 
         @Override
-        public void aggiorna(String nomeCanale, String titoloVideo) {
-            System.out.println(nome + " ha ricevuto la notifica:");
-            System.out.println("Nuovo video sul canale " + nomeCanale + ": " + titoloVideo);
+        public double costo() {
+            return 1.00;
         }
     }
 
     // =====================================================
-    // CLASSE CONCRETA SOGGETTO
+    // DECORATOR ASTRATTO
     // =====================================================
 
-    static class CanaleYoutube implements Soggetto {
+    static abstract class DecoratoreBevanda implements Bevanda {
 
-        String nomeCanale;
-        String ultimoVideo;
+        protected Bevanda bevanda;
 
-        // Array semplice per non usare collezioni esterne
-        Osservatore[] osservatori = new Osservatore[10];
-        int numeroOsservatori = 0;
+        public DecoratoreBevanda(Bevanda bevanda) {
+            this.bevanda = bevanda;
+        }
+    }
 
-        public CanaleYoutube(String nomeCanale) {
-            this.nomeCanale = nomeCanale;
+    // =====================================================
+    // DECORATOR CONCRETO: LATTE
+    // =====================================================
+
+    static class Latte extends DecoratoreBevanda {
+
+        public Latte(Bevanda bevanda) {
+            super(bevanda);
         }
 
         @Override
-        public void aggiungiOsservatore(Osservatore osservatore) {
-            if (numeroOsservatori < osservatori.length) {
-                osservatori[numeroOsservatori] = osservatore;
-                numeroOsservatori++;
-            }
+        public String descrizione() {
+            return bevanda.descrizione() + " + latte";
         }
 
         @Override
-        public void rimuoviOsservatore(Osservatore osservatore) {
-            for (int i = 0; i < numeroOsservatori; i++) {
-                if (osservatori[i] == osservatore) {
-
-                    // Sposto tutti gli elementi successivi una posizione indietro
-                    for (int j = i; j < numeroOsservatori - 1; j++) {
-                        osservatori[j] = osservatori[j + 1];
-                    }
-
-                    osservatori[numeroOsservatori - 1] = null;
-                    numeroOsservatori--;
-                    break;
-                }
-            }
+        public double costo() {
+            return bevanda.costo() + 0.50;
         }
+    }
 
-        public void pubblicaVideo(String titoloVideo) {
-            ultimoVideo = titoloVideo;
-            System.out.println("Il canale " + nomeCanale + " ha pubblicato un nuovo video:");
-            System.out.println(titoloVideo);
-            System.out.println("Notifico gli iscritti...");
-            notificaOsservatori();
+    // =====================================================
+    // DECORATOR CONCRETO: CIOCCOLATO
+    // =====================================================
+
+    static class Cioccolato extends DecoratoreBevanda {
+
+        public Cioccolato(Bevanda bevanda) {
+            super(bevanda);
         }
 
         @Override
-        public void notificaOsservatori() {
-            for (int i = 0; i < numeroOsservatori; i++) {
-                osservatori[i].aggiorna(nomeCanale, ultimoVideo);
-            }
+        public String descrizione() {
+            return bevanda.descrizione() + " + cioccolato";
+        }
+
+        @Override
+        public double costo() {
+            return bevanda.costo() + 0.70;
+        }
+    }
+
+    // =====================================================
+    // DECORATOR CONCRETO: PANNA
+    // =====================================================
+
+    static class Panna extends DecoratoreBevanda {
+
+        public Panna(Bevanda bevanda) {
+            super(bevanda);
+        }
+
+        @Override
+        public String descrizione() {
+            return bevanda.descrizione() + " + panna";
+        }
+
+        @Override
+        public double costo() {
+            return bevanda.costo() + 0.60;
         }
     }
 }
