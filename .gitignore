@@ -22,3 +22,8 @@
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
+Springboot/CorsoSB.md
+Springboot/giorno1_spring_boot.md
+Springboot/giorno2_ioc_bean_di.md
+Springboot/giorno3_java_records_dominio.md
+Springboot/giorno4_rest_controller_http.md
