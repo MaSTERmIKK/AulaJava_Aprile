@@ -501,16 +501,7 @@ public class RunController {
     // DELETE /api/runs/{id} → elimina una corsa
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Integer id) {
-        Optional<Run> existing = runs.stream()
-                                     .filter(r -> r.id().equals(id))
-                                     .findFirst();
-
-        if (existing.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-
-        runs.remove(existing.get());
-        return ResponseEntity.noContent().build();
+        
     }
 }
 ```
