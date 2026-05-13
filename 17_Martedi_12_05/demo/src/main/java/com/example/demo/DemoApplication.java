@@ -47,15 +47,25 @@ public class DemoApplication {
 	@Bean
 	CommandLineRunner runner(OrderService orderService){
 		return args -> {
-			// RunRecord run = new RunRecord(124, 
-			// 						"Corsa pomeridiana", 
-			// 						LocalDateTime.now(), 
-			// 						LocalDateTime.now().plus(1, ChronoUnit.HOURS),
-			// 						5,
-			// 						Location.INDOOR);
-			// System.out.println("Run " + run);
-			orderService.processOrder("ORD-001");
-			orderService.processOrder("ORD-002");
+			// RunRecord run = new RunRecord(
+			// 			124, 
+			// 			"Corsa pomeridiana", 
+			// 			LocalDateTime.now(), 
+			// 			LocalDateTime.now().plus(1, ChronoUnit.HOURS),
+			// 			5,
+			// 			Location.INDOOR);
+			// RunRecord run2 = new RunRecord(
+			// 	125, 
+			// 	"Corsa non valida", 
+			// 	LocalDateTime.now().plus(1, ChronoUnit.HOURS), 
+			// 	LocalDateTime.now(), 
+			// 	-1, 
+			// 	Location.INDOOR);
+			
+			// 	System.out.println("Run " + run);
+			// 	System.out.println("Run2 " + run2);
+			// orderService.processOrder("ORD-001");
+			// orderService.processOrder("ORD-002");
 		};
 	}
 
