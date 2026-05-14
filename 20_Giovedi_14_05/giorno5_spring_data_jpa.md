@@ -120,6 +120,13 @@ spring.jpa.show-sql=true
 # Formatta le query SQL per renderle leggibili
 spring.jpa.properties.hibernate.format_sql=true
 
+#Inizializza il data.sql in resources dopo l'avvio 
+spring.jpa.properties.hibernate.format_sql=true
+spring.jpa.defer-datasource-initialization=true
+
+spring.sql.init.mode=always
+spring.sql.init.data-locations=classpath:data.sql
+
 # ── H2 Console ───────────────────────────────────────────────────────────────
 # Abilita la console web di H2 (accessibile su /h2-console)
 spring.h2.console.enabled=true
@@ -677,13 +684,13 @@ Spring Boot esegue `data.sql` automaticamente all'avvio, dopo che Hibernate ha c
 
 ### Obiettivo
 
-Completare la migrazione del progetto `Run` dalla lista in memoria al database H2, implementando tutti e quattro gli endpoint CRUD, testandoli con Postman e verificando la persistenza tramite H2 Console.
+Realizzare un piccolo **catalogo libri** persistente su database H2, implementando tutti e quattro gli endpoint CRUD, testandoli con Postman e verificando la persistenza tramite H2 Console.
 
 ---
 
 ### Prerequisiti
 
-- Progetto `Run` funzionante dal Giorno 4 con `RunController` e `Run` come record
+- Progetto Spring Boot funzionante con un controller REST di base
 - Maven configurato con Spring Web già presente
 
 ---
@@ -713,79 +720,67 @@ Salva e lascia che Maven scarichi le dipendenze (IntelliJ: clicca sul popup **Lo
 Sostituisci il contenuto di `src/main/resources/application.properties` con:
 
 ```properties
-spring.application.name=run
+spring.application.name=demo
 
-spring.datasource.url=jdbc:h2:mem:rundb
+server.port=8080
+
+spring.datasource.url=jdbc:h2:mem:librarydb
 spring.datasource.driver-class-name=org.h2.Driver
+
 spring.datasource.username=sa
 spring.datasource.password=
 
 spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
 spring.jpa.hibernate.ddl-auto=create-drop
 spring.jpa.show-sql=true
+
 spring.jpa.properties.hibernate.format_sql=true
+spring.jpa.defer-datasource-initialization=true
+
+spring.sql.init.mode=always
+spring.sql.init.data-locations=classpath:data.sql
 
 spring.h2.console.enabled=true
 ```
 
 ---
 
-### Step 3 — Convertire `Run` da Record a `@Entity`
+### Step 3 — Creare `Book` come `@Entity`
 
-Sostituisci il file `Run.java` (o `Run` record) con la classe annotata `@Entity` mostrata nella sezione 2, con:
+Sostituisci il modello con una nuova entita `Book` (classe ordinaria, non record), ad esempio in `src/main/java/com/example/library/model/Book.java`:
 
-- `@Entity` e `@Table(name = "runs")`
+- `@Entity` e `@Table(name = "books")`
 - `@Id` e `@GeneratedValue(strategy = GenerationType.IDENTITY)` sul campo `id`
-- `@Column` su ogni campo
-- `@Enumerated(EnumType.STRING)` sul campo `location`
-- Costruttore no-arg `protected Run() {}`
+- `@Column` sui campi principali (`title`, `author`, `pages`)
+- `@Enumerated(EnumType.STRING)` su un campo enum `genre` (es. `TECH`, `FICTION`, `HISTORY`)
+- Costruttore no-arg `protected Book() {}`
 - Costruttore completo con validazione
 - Getter e setter per tutti i campi
 
 ---
 
-### Step 4 — Creare `RunRepository`
+### Step 4 — Creare `BookRepository`
 
-Crea il file `src/main/java/com/example/run/repository/RunRepository.java`:
+Crea il file `src/main/java/com/example/library/repository/BookRepository.java` aggiungendo almeno 6 funzioni query a tua scelta e fantasia:
 
 ```java
-package com.example.run.repository;
-
-import com.example.run.model.Run;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-
 @Repository
-public interface RunRepository extends JpaRepository<Run, Integer> {
+public interface BookRepository extends JpaRepository<Book, Integer> {
     // Spring genera l'implementazione automaticamente
 }
 ```
 
 ---
 
-### Step 5 — Aggiornare `RunController`
+### Step 5 — Crea `BookController`
 
-Aggiorna `RunController` per usare `RunRepository` al posto della lista in memoria:
-
-1. Rimuovi il campo `private final List<Run> runs = ...`
-2. Aggiungi il campo `private final RunRepository runRepository`
-3. Inietta `RunRepository` tramite costruttore
-4. Aggiorna i metodi esistenti (`findAll`, `findById`) per usare il repository
-5. Aggiungi i metodi `create`, `update`, `delete` come mostrato nella sezione 3
+Aggiorna (o crea) `BookController` scrivendo tutti gli EndPoint necessari (a tua discrezione)
 
 ---
 
 ### Step 6 — Creare `data.sql` con dati iniziali
 
-Crea il file `src/main/resources/data.sql`:
-
-```sql
-INSERT INTO runs (title, started_on, completed_on, miles, location)
-VALUES ('Corsa mattutina', '2024-03-01 07:00:00', '2024-03-01 07:45:00', 5.0, 'OUTDOOR');
-
-INSERT INTO runs (title, started_on, completed_on, miles, location)
-VALUES ('Allenamento indoor', '2024-03-02 18:00:00', '2024-03-02 18:30:00', 3.1, 'INDOOR');
-```
+Crea il file `src/main/resources/data.sql` e inseriscilo nella cartella resource (attento al file application.properties)
 
 ---
 
@@ -793,63 +788,62 @@ VALUES ('Allenamento indoor', '2024-03-02 18:00:00', '2024-03-02 18:30:00', 3.1,
 
 Avvia l'applicazione con `./mvnw spring-boot:run` e verifica nella console che Hibernate abbia creato la tabella.
 
-**Test 1 — GET /api/runs (lista tutte le corse)**
+**Test 1 — GET /api/books (lista tutti i libri)**
 
 - Metodo: `GET`
-- URL: `http://localhost:8080/api/runs`
-- Risultato atteso: array JSON con le 2 corse del `data.sql`
+- URL: `http://localhost:8080/api/books`
+- Risultato atteso: array JSON con i 2 libri del `data.sql`
 
-**Test 2 — GET /api/runs/{id} (singola corsa)**
+**Test 2 — GET /api/books/{id} (singolo libro)**
 
 - Metodo: `GET`
-- URL: `http://localhost:8080/api/runs/1`
-- Risultato atteso: oggetto JSON con la prima corsa
-- Bonus: prova con un ID inesistente (es. `/api/runs/999`) — dovresti ricevere `404 Not Found`
+- URL: `http://localhost:8080/api/books/1`
+- Risultato atteso: oggetto JSON con il primo libro
+- Bonus: prova con un ID inesistente (es. `/api/books/999`) — dovresti ricevere `404 Not Found`
 
-**Test 3 — POST /api/runs (crea nuova corsa)**
+**Test 3 — POST /api/books (crea nuovo libro)**
 
 - Metodo: `POST`
-- URL: `http://localhost:8080/api/runs`
+- URL: `http://localhost:8080/api/books`
 - Header: `Content-Type: application/json`
 - Body (JSON raw):
 
 ```json
 {
-  "title": "Corsa serale",
-  "startedOn": "2024-03-10T19:00:00",
-  "completedOn": "2024-03-10T19:40:00",
-  "miles": 4.5,
-  "location": "OUTDOOR"
+    "title": "Effective Java",
+    "author": "Joshua Bloch",
+    "pages": 416,
+    "genre": "TECH"
 }
 ```
 
 - Risultato atteso: `201 Created` con l'oggetto creato (campo `id` valorizzato dal DB)
 
-**Test 4 — PUT /api/runs/{id} (aggiorna)**
+**Test 4 — PUT /api/books/{id} (aggiorna)**
 
 - Metodo: `PUT`
-- URL: `http://localhost:8080/api/runs/1`
+- URL: `http://localhost:8080/api/books/1`
 - Header: `Content-Type: application/json`
-- Body: stessa struttura del POST, con valori modificati (es. `"miles": 6.0`)
+- Body: stessa struttura del POST, con valori modificati (es. `"pages": 500`)
 - Risultato atteso: `200 OK` con i dati aggiornati
 
-**Test 5 — DELETE /api/runs/{id} (elimina)**
+**Test 5 — DELETE /api/books/{id} (elimina)**
 
 - Metodo: `DELETE`
-- URL: `http://localhost:8080/api/runs/2`
+- URL: `http://localhost:8080/api/books/2`
 - Risultato atteso: `204 No Content` (nessun body)
-- Verifica: esegui GET /api/runs — la corsa con id 2 non deve più essere presente
+- Verifica: esegui GET /api/books — il libro con id 2 non deve più essere presente
 
 ---
 
 ### Step 8 — Verificare con H2 Console
 
 1. Apri `http://localhost:8080/h2-console` nel browser
-2. Connettiti con JDBC URL `jdbc:h2:mem:rundb`, username `sa`, password vuota
+2. Connettiti con JDBC URL `jdbc:h2:mem:librarydb`, username `sa`, password vuota
 3. Esegui:
 
 ```sql
-SELECT * FROM runs;
+SELECT * FROM books;
 ```
 
 Verifica che le righe corrispondano allo stato attuale del database dopo le operazioni Postman.
@@ -860,7 +854,7 @@ Verifica che le righe corrispondano allo stato attuale del database dopo le oper
 
 1. Cosa succede al contenuto del database se riavvii l'applicazione con `ddl-auto=create-drop`? E con `ddl-auto=update`?
 2. Perché `JpaRepository` usa `Optional<T>` nel metodo `findById()` invece di restituire direttamente `T`?
-3. Come fa Spring Data JPA a sapere quale SQL generare per il metodo `findByMilesGreaterThan(double miles)` senza che tu scriva alcuna query?
+3. Come fa Spring Data JPA a sapere quale SQL generare per il metodo `findByPagesGreaterThan(int pages)` senza che tu scriva alcuna query?
 4. Qual è la differenza tra `save()` applicato a un'entità senza `id` e `save()` applicato a un'entità con `id` già esistente?
 5. Perché un'entità JPA non può essere un `record` Java?
 
