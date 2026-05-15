@@ -12,6 +12,11 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 
 @Entity
 @Table(name = "runs")
@@ -20,17 +25,26 @@ public class Run
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
-    @Column(name = "title", nullable = false, length = 255)
+
+    @NotBlank
+    @Size(min = 3, max = 100, message = "il titolo deve avere tra i 3 e i 100 caratteri" )
     private String title;
-    @Column(name = "startedOn", nullable = false)
+
+    @Column(name = "startedOn")
+    @NotNull(message = "la data di inizio è obbligatoria")
     private LocalDateTime startedOn;
-    @Column(name = "completedOn", nullable = false)
+
+    @Column(name = "completedOn")
+    @NotNull(message = "la data di fine è obbligatoria")
     private LocalDateTime completedOn;
-    @Column(name = "miles", nullable = false)
+
+    @Column(name = "miles")
+    @Positive(message = "la distanza percorsa deve essere positiva")
+    @Max(value = 200, message = "Non si può registrare oltre i 200 chilometri")
     private Integer miles;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "location", nullable = false)
+    @Column(name = "location")
     private Location location;
 
     protected Run() {}
@@ -43,8 +57,6 @@ public class Run
                 Location location)
     {
         this.title = title;
-        if (miles < 0) throw new IllegalArgumentException("Le miglia non possono essere negative");
-        if (completedOn.isBefore(startedOn)) throw new IllegalArgumentException("La data di fine deve essere dopo quella di inizio");
         this.startedOn = startedOn;
         this.completedOn = completedOn;
         this.miles = miles;
