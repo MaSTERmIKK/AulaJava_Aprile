@@ -47,7 +47,7 @@ public class Run
     @Column(name = "location")
     private Location location;
 
-    protected Run() {}
+    public Run() {}
 
     public Run ( 
                 String title, 

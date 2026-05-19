@@ -18,6 +18,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.demo.Run.model.Run;
+import com.example.demo.Run.record.RunRequest;
+import com.example.demo.Run.record.RunResponse;
 import com.example.demo.Run.service.RunService;
 
 import jakarta.validation.Valid;
@@ -35,19 +37,18 @@ public class RunController {
     }
 
     @GetMapping
-    public List<Run> findAll(){
+    public List<RunResponse> findAll(){
         return runService.findAll();
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Run> findById(@PathVariable Integer id) {
-        Optional<Run> run = runService.findById(id);
-        return run.map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<RunResponse> findById(@PathVariable Integer id) {
+        RunResponse run = runService.findById(id);
+        return ResponseEntity.ok(run);
     }
     
     @PostMapping
-    public ResponseEntity<?> create(@Valid @RequestBody Run run, BindingResult bindingResult)
+    public ResponseEntity<?> create(@Valid @RequestBody RunRequest run, BindingResult bindingResult)
     {
         if(bindingResult.hasErrors()){
             Map<String, String> errors = new HashMap<>();
@@ -69,7 +70,7 @@ public class RunController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Integer id){
-        if(runService.findById(id).isEmpty()){
+        if(runService.findById(id) == null){
             return ResponseEntity.notFound().build();
         }
 

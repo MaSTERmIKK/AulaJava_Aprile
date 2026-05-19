@@ -162,43 +162,48 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
-@RestController
+RestController
 @RequestMapping("/api/runs")
 public class RunController {
-
+    
     private final RunService runService;
 
-    public RunController(RunService runService) {
+    public RunController(RunService runService){
         this.runService = runService;
     }
 
     @GetMapping
-    public List<Run> findAll() {
+    public List<Run> findAll(){
         return runService.findAll();
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<Run> findById(@PathVariable Integer id) {
-        return runService.findById(id)
-                .map(ResponseEntity::ok)
+        Optional<Run> run = runService.findById(id);
+        return run.map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
-
+    
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public Run create(@RequestBody Run run) {
-        return runService.save(run);
+    public ResponseEntity<Run> create(@Valid @RequestBody Run run)
+    {
+        return ResponseEntity.status(HttpStatus.CREATED).body(runService.save(run));
     }
 
     @PutMapping("/{id}")
-    public Run update(@PathVariable Integer id, @RequestBody Run run) {
-        return runService.update(id, run);
+    public ResponseEntity<Run> update(@PathVariable Integer id, @Valid @RequestBody Run runDetails) {
+        Run updated = runService.update(id, runDetails);
+        return ResponseEntity.ok(updated);
     }
 
     @DeleteMapping("/{id}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable Integer id) {
+    public ResponseEntity<Void> delete(@PathVariable Integer id){
+        if(runService.findById(id).isEmpty()){
+            return ResponseEntity.notFound().build();
+        }
+
         runService.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 }
 ```
@@ -287,28 +292,31 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "runs")
-public class Run {
-
+public class Run 
+{
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @NotBlank(message = "Il titolo non può essere vuoto")
-    @Size(min = 3, max = 100, message = "Il titolo deve avere tra 3 e 100 caratteri")
+    @NotBlank
+    @Size(min = 3, max = 100, message = "il titolo deve avere tra i 3 e i 100 caratteri" )
     private String title;
 
-    @NotNull(message = "La data di inizio è obbligatoria")
+    @Column(name = "startedOn")
+    @NotNull(message = "la data di inizio è obbligatoria")
     private LocalDateTime startedOn;
 
-    @NotNull(message = "La data di fine è obbligatoria")
+    @Column(name = "completedOn")
+    @NotNull(message = "la data di fine è obbligatoria")
     private LocalDateTime completedOn;
 
-    @Positive(message = "I chilometri devono essere un valore positivo")
-    @Max(value = 200, message = "Non si possono registrare più di 200 miglia")
-    private int miles;
+    @Column(name = "miles")
+    @Positive(message = "la distanza percorsa deve essere positiva")
+    @Max(value = 200, message = "Non si può registrare oltre i 200 chilometri")
+    private Integer miles;
 
-    @NotNull(message = "La location è obbligatoria")
     @Enumerated(EnumType.STRING)
+    @Column(name = "location")
     private Location location;
 
     // Costruttori, getter, setter...
