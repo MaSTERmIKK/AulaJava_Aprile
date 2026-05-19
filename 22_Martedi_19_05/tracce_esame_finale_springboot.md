@@ -1,3 +1,16 @@
+### Richieste
+>
+>- repo GitHub con readme esplicativo del progetto e informazioni dei singoli partecipanti
+>- Seguire la traccia e utilizzare tutte le conoscenze acquisite, con libertà di creare e progettare oltre la traccia
+
+### Traccie
+
 - **Traccia 1 - Gestione Libreria**: realizza una REST API con CRUD per i libri (`titolo`, `autore`, `annoPubblicazione`, `disponibile`). Aggiungi validazioni base e gestione errori con codici HTTP corretti.
 - **Traccia 2 - Gestione Prenotazioni Ristorante**: crea un'app Spring Boot con endpoint per inserire, modificare e cancellare prenotazioni (`nomeCliente`, `numeroPersone`, `dataOra`). Inserisci un controllo per evitare prenotazioni in date passate.
 - **Traccia 3 - Gestione To-Do Utente**: sviluppa una REST API per attività personali (`descrizione`, `scadenza`, `completata`). Implementa filtro per stato (completata/non completata) e ordinamento per scadenza.
+
+### Gruppi
+
+1. Anna Gloria, Danilo Mosca, Giuseppe Giordano
+2. Mauro Bilardo, Andrea Cataudella, Tommaso Ciccotti
+3. Mohamed Saadi, Francesco Palazzo
