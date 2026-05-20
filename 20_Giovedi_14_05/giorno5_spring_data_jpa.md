@@ -9,7 +9,8 @@
 1. [JPA & Hibernate — Introduzione](#1-jpa--hibernate--introduzione)
 2. [@Entity & Configurazione Tabella](#2-entity--configurazione-tabella)
 3. [JpaRepository — CRUD Automatico](#3-jparepository--crud-automatico)
-4. [Esercizio — CRUD Completo con DB](#4-esercizio--crud-completo-con-db)
+4. [Relazioni tra Entità](#4-relazioni-tra-entità)
+5. [Esercizio — CRUD Completo con DB](#5-esercizio--crud-completo-con-db)
 
 ---
 
@@ -119,13 +120,6 @@ spring.jpa.show-sql=true
 
 # Formatta le query SQL per renderle leggibili
 spring.jpa.properties.hibernate.format_sql=true
-
-#Inizializza il data.sql in resources dopo l'avvio 
-spring.jpa.properties.hibernate.format_sql=true
-spring.jpa.defer-datasource-initialization=true
-
-spring.sql.init.mode=always
-spring.sql.init.data-locations=classpath:data.sql
 
 # ── H2 Console ───────────────────────────────────────────────────────────────
 # Abilita la console web di H2 (accessibile su /h2-console)
@@ -355,7 +349,7 @@ public class Run {
 }
 ```
 
-> ⚠️ **Nota sull'`@Enumerated`:** senza questa annotazione, Hibernate salverebbe l'enum come numero intero (`0`, `1`, ...). Con `EnumType.STRING` viene salvato come testo (`"INDOOR"`, `"OUTDOOR"`), rendendo il database molto più leggibile.
+> **Nota sull'`@Enumerated`:** senza questa annotazione, Hibernate salverebbe l'enum come numero intero (`0`, `1`, ...). Con `EnumType.STRING` viene salvato come testo (`"INDOOR"`, `"OUTDOOR"`), rendendo il database molto più leggibile.
 
 ---
 
@@ -553,7 +547,7 @@ public interface RunRepository extends JpaRepository<Run, Integer> {
 }
 ```
 
-> 💡 **`@Repository` è opzionale** quando si estende `JpaRepository` (Spring la rileva automaticamente), ma è buona pratica includerla per chiarezza architetturale e per abilitare la traduzione delle eccezioni JPA in eccezioni Spring.
+> **`@Repository` è opzionale** quando si estende `JpaRepository` (Spring la rileva automaticamente), ma è buona pratica includerla per chiarezza architetturale e per abilitare la traduzione delle eccezioni JPA in eccezioni Spring.
 
 ---
 
@@ -562,7 +556,7 @@ public interface RunRepository extends JpaRepository<Run, Integer> {
 Prima del Giorno 5, il controller gestiva i dati con una lista statica in memoria:
 
 ```java
-// ❌ Prima — dati in memoria (tutto si perde al riavvio)
+// Prima — dati in memoria (tutto si perde al riavvio)
 private final List<Run> runs = new ArrayList<>(List.of(
     new Run(1, "Corsa mattutina", startedOn, completedOn, 5.0, Location.OUTDOOR),
     new Run(2, "Corsa in palestra", startedOn, completedOn, 3.1, Location.INDOOR)
@@ -572,7 +566,7 @@ private final List<Run> runs = new ArrayList<>(List.of(
 Con `RunRepository`, quella lista non serve più. I dati arrivano dal database:
 
 ```java
-// ✅ Dopo — dati dal database
+// Dopo — dati dal database
 @GetMapping
 public List<Run> findAll() {
     return runRepository.findAll();  // SELECT * FROM runs
@@ -676,21 +670,369 @@ VALUES ('Mezza maratona domenicale', '2024-03-03 09:00:00', '2024-03-03 10:45:00
 
 Spring Boot esegue `data.sql` automaticamente all'avvio, dopo che Hibernate ha creato le tabelle.
 
-> ⚠️ Con `ddl-auto=create-drop`, il file `data.sql` viene eseguito ad ogni avvio. Con `ddl-auto=update` invece, i dati vengono aggiunti senza azzerare la tabella.
+> Con `ddl-auto=create-drop`, il file `data.sql` viene eseguito ad ogni avvio. Con `ddl-auto=update` invece, i dati vengono aggiunti senza azzerare la tabella.
 
 ---
 
-## 4. Esercizio — CRUD Completo con DB
+## 4. Relazioni tra Entità
+
+### Teoria
+
+Nelle applicazioni reali le entità raramente esistono in isolamento: un `Autore` ha molti `Libri`, un `Ordine` contiene molti `Prodotti`, un `Utente` ha un `Profilo`. JPA gestisce queste relazioni tramite quattro annotazioni principali.
+
+#### Panoramica delle relazioni
+
+| Annotazione     | Significato                                  | Esempio                                |
+|-----------------|----------------------------------------------|----------------------------------------|
+| `@ManyToOne`    | Molti oggetti → un solo oggetto padre        | Molti `Run` appartengono a un `User`   |
+| `@OneToMany`    | Un oggetto → molti figli                     | Un `User` ha molte `Run`               |
+| `@OneToOne`     | Un oggetto ↔ un solo oggetto                 | Un `User` ha un `Profilo`              |
+| `@ManyToMany`   | Molti oggetti ↔ molti oggetti                | Un `Corso` ha molti `Studenti` e viceversa |
+
+---
+
+#### `@ManyToOne` — il lato "molti"
+
+`@ManyToOne` è l'annotazione più comune. Si mette **sul lato che possiede la foreign key** (il lato "molti").
+
+```java
+// Scenario: molte Run appartengono a un singolo User
+
+@Entity
+@Table(name = "runs")
+public class Run {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
+
+    @Column(nullable = false)
+    private String title;
+
+    // ── Relazione: molte Run → un User ──────────────────────────────────────
+    @ManyToOne
+    @JoinColumn(name = "user_id", nullable = false)  // nome della FK nella tabella runs
+    private User user;
+
+    // ... altri campi, getter, setter
+}
+```
+
+`@JoinColumn(name = "user_id")` dice a Hibernate di creare/usare la colonna `user_id` nella tabella `runs` come foreign key verso la tabella `users`.
+
+---
+
+#### `@OneToMany` — il lato "uno"
+
+`@OneToMany` si usa sull'entità che contiene la **collection** dei figli. Di solito è l'inverso di `@ManyToOne`.
+
+```java
+@Entity
+@Table(name = "users")
+public class User {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
+
+    @Column(nullable = false)
+    private String name;
+
+    // ── Relazione inversa: un User → molte Run ──────────────────────────────
+    @OneToMany(
+        mappedBy = "user",           // nome del campo @ManyToOne in Run
+        cascade = CascadeType.ALL,   // operazioni propagate ai figli
+        orphanRemoval = true         // cancella i figli orfani automaticamente
+    )
+    private List<Run> runs = new ArrayList<>();
+
+    // ... costruttore, getter, setter
+}
+```
+
+> **`mappedBy`** indica che la relazione è già mappata dall'altro lato (`Run.user`). Senza `mappedBy`, JPA creerebbe una tabella di join intermedia non necessaria.
+
+---
+
+#### Relazione bidirezionale vs unidirezionale
+
+| Tipo             | Descrizione                                                                        |
+|------------------|------------------------------------------------------------------------------------|
+| **Unidirezionale** | Solo un lato conosce l'altro. Più semplice, meno overhead.                       |
+| **Bidirezionale**  | Entrambi i lati si riferiscono l'un l'altro (`@ManyToOne` + `@OneToMany`). Utile per navigare la relazione in entrambe le direzioni. |
+
+In una relazione bidirezionale è buona norma aggiungere **metodi helper** per mantenere la coerenza:
+
+```java
+// In User.java
+public void addRun(Run run) {
+    runs.add(run);
+    run.setUser(this);  // mantiene sincronizzato anche il lato Run
+}
+
+public void removeRun(Run run) {
+    runs.remove(run);
+    run.setUser(null);
+}
+```
+
+---
+
+#### `@OneToOne` — relazione uno a uno
+
+Usata quando un'entità è associata a esattamente un'altra entità. La FK può stare su entrambi i lati; per convenzione si mette sul lato "dipendente".
+
+```java
+@Entity
+@Table(name = "user_profiles")
+public class UserProfile {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
+
+    private String bio;
+    private String avatarUrl;
+
+    // ── Relazione: un Profilo → un User (proprietario della FK) ────────────
+    @OneToOne
+    @JoinColumn(name = "user_id", unique = true)
+    private User user;
+}
+```
+
+```java
+// Lato inverso in User.java
+@OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+private UserProfile profile;
+```
+
+---
+
+#### `@ManyToMany` — relazione molti a molti
+
+Una relazione molti-a-molti richiede una **tabella di join** intermedia. JPA la crea automaticamente tramite `@JoinTable`.
+
+```java
+@Entity
+@Table(name = "courses")
+public class Course {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
+
+    private String title;
+
+    // ── Relazione: un Corso ↔ molti Studenti ────────────────────────────────
+    @ManyToMany
+    @JoinTable(
+        name = "course_students",               // nome tabella di join
+        joinColumns = @JoinColumn(name = "course_id"),    // FK verso Course
+        inverseJoinColumns = @JoinColumn(name = "student_id")  // FK verso Student
+    )
+    private List<Student> students = new ArrayList<>();
+}
+```
+
+```java
+@Entity
+@Table(name = "students")
+public class Student {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
+
+    private String name;
+
+    // ── Lato inverso ────────────────────────────────────────────────────────
+    @ManyToMany(mappedBy = "students")
+    private List<Course> courses = new ArrayList<>();
+}
+```
+
+Hibernate crea automaticamente:
+```sql
+CREATE TABLE course_students (
+    course_id  INTEGER NOT NULL,
+    student_id INTEGER NOT NULL,
+    PRIMARY KEY (course_id, student_id)
+);
+```
+
+---
+
+#### FetchType — caricamento Lazy vs Eager
+
+Quando JPA carica un'entità, deve decidere **quando** recuperare le entità correlate dal database.
+
+| FetchType    | Comportamento                                                                 | Default per              |
+|--------------|-------------------------------------------------------------------------------|---------------------------|
+| `LAZY`       | Le entità correlate vengono caricate **solo quando si accede al campo**       | `@OneToMany`, `@ManyToMany` |
+| `EAGER`      | Le entità correlate vengono caricate **subito, nella stessa query**           | `@ManyToOne`, `@OneToOne`  |
+
+```java
+// Caricamento esplicito LAZY (raccomandato per collection)
+@OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
+private List<Run> runs;
+
+// Caricamento esplicito EAGER (usa con cautela: può generare query molto pesanti)
+@ManyToOne(fetch = FetchType.EAGER)
+@JoinColumn(name = "user_id")
+private User user;
+```
+
+> **Regola pratica:** usa sempre `LAZY` per le collection (`@OneToMany`, `@ManyToMany`). `EAGER` su una collection con centinaia di elementi genera un unico SELECT gigante che può bloccare il database.
+
+---
+
+#### CascadeType — propagazione delle operazioni
+
+`CascadeType` specifica quali operazioni JPA vengono automaticamente **propagate** ai figli quando vengono eseguite sul padre.
+
+| CascadeType   | Operazione propagata                              |
+|---------------|---------------------------------------------------|
+| `PERSIST`     | `save()` del padre → salva anche i figli         |
+| `MERGE`       | aggiornamento del padre → aggiorna anche i figli  |
+| `REMOVE`      | `delete()` del padre → cancella anche i figli    |
+| `REFRESH`     | `refresh()` del padre → ricarica anche i figli   |
+| `DETACH`      | `detach()` del padre → stacca anche i figli      |
+| `ALL`         | tutte le operazioni sopra                         |
+
+```java
+// Con CascadeType.ALL: salvare un User salva automaticamente anche le sue Run
+@OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+private List<Run> runs;
+
+// Senza cascade: bisogna salvare Run separatamente
+@ManyToOne
+@JoinColumn(name = "user_id")
+private User user;  // non propaga nulla
+```
+
+> 💡 **`orphanRemoval = true`:** se rimuovi un `Run` dalla lista `user.getRuns()`, Hibernate lo cancella automaticamente dal database. Senza questa opzione, la Run diventerebbe un "orfano" con `user_id = null`.
+
+---
+
+### Esempio pratico — `User` con `Run` (relazione bidirezionale)
+
+Vediamo l'implementazione completa della relazione `User` → `Run`:
+
+```java
+// User.java
+package com.example.run.model;
+
+import jakarta.persistence.*;
+import java.util.ArrayList;
+import java.util.List;
+
+@Entity
+@Table(name = "users")
+public class User {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
+
+    @Column(nullable = false, length = 100)
+    private String name;
+
+    @Column(nullable = false, unique = true, length = 150)
+    private String email;
+
+    @OneToMany(
+        mappedBy = "user",
+        cascade = CascadeType.ALL,
+        orphanRemoval = true,
+        fetch = FetchType.LAZY
+    )
+    private List<Run> runs = new ArrayList<>();
+
+    protected User() {}
+
+    public User(String name, String email) {
+        this.name = name;
+        this.email = email;
+    }
+
+    // Helper per mantenere la coerenza della relazione bidirezionale
+    public void addRun(Run run) {
+        runs.add(run);
+        run.setUser(this);
+    }
+
+    public void removeRun(Run run) {
+        runs.remove(run);
+        run.setUser(null);
+    }
+
+    public Integer getId()       { return id; }
+    public String getName()      { return name; }
+    public String getEmail()     { return email; }
+    public List<Run> getRuns()   { return runs; }
+
+    public void setName(String name)   { this.name = name; }
+    public void setEmail(String email) { this.email = email; }
+}
+```
+
+```java
+// Run.java — aggiunta del campo user
+@ManyToOne(fetch = FetchType.LAZY)
+@JoinColumn(name = "user_id", nullable = false)
+private User user;
+
+// Getter e setter da aggiungere
+public User getUser()          { return user; }
+public void setUser(User user) { this.user = user; }
+```
+
+Hibernate genera le tabelle:
+
+```sql
+CREATE TABLE users (
+    id    INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    name  VARCHAR(100) NOT NULL,
+    email VARCHAR(150) NOT NULL UNIQUE
+);
+
+CREATE TABLE runs (
+    id           INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    title        VARCHAR(255) NOT NULL,
+    started_on   TIMESTAMP    NOT NULL,
+    completed_on TIMESTAMP    NOT NULL,
+    miles        FLOAT        NOT NULL,
+    location     VARCHAR(255) NOT NULL,
+    user_id      INTEGER      NOT NULL,  -- ← FK aggiunta da @ManyToOne
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+```
+
+---
+
+### Riepilogo — Relazioni JPA
+
+| Annotazione     | Lato proprietario FK | Usa `mappedBy`? | `@JoinTable`? |
+|-----------------|---------------------|-----------------|---------------|
+| `@ManyToOne`    | Sì (questo lato)    | No              | No            |
+| `@OneToMany`    | No (lato inverso)   | Sì              | No            |
+| `@OneToOne`     | Il lato con la FK   | Lato inverso    | No            |
+| `@ManyToMany`   | Il proprietario     | Lato inverso    | Sì            |
+
+---
+
+## 5. Esercizio — CRUD Completo con DB
 
 ### Obiettivo
 
-Realizzare un piccolo **catalogo libri** persistente su database H2, implementando tutti e quattro gli endpoint CRUD, testandoli con Postman e verificando la persistenza tramite H2 Console.
+Completare la migrazione del progetto `Run` dalla lista in memoria al database H2, implementando tutti e quattro gli endpoint CRUD, testandoli con Postman e verificando la persistenza tramite H2 Console.
 
 ---
 
 ### Prerequisiti
 
-- Progetto Spring Boot funzionante con un controller REST di base
+- Progetto `Run` funzionante dal Giorno 4 con `RunController` e `Run` come record
 - Maven configurato con Spring Web già presente
 
 ---
@@ -720,67 +1062,79 @@ Salva e lascia che Maven scarichi le dipendenze (IntelliJ: clicca sul popup **Lo
 Sostituisci il contenuto di `src/main/resources/application.properties` con:
 
 ```properties
-spring.application.name=demo
+spring.application.name=run
 
-server.port=8080
-
-spring.datasource.url=jdbc:h2:mem:librarydb
+spring.datasource.url=jdbc:h2:mem:rundb
 spring.datasource.driver-class-name=org.h2.Driver
-
 spring.datasource.username=sa
 spring.datasource.password=
 
 spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
 spring.jpa.hibernate.ddl-auto=create-drop
 spring.jpa.show-sql=true
-
 spring.jpa.properties.hibernate.format_sql=true
-spring.jpa.defer-datasource-initialization=true
-
-spring.sql.init.mode=always
-spring.sql.init.data-locations=classpath:data.sql
 
 spring.h2.console.enabled=true
 ```
 
 ---
 
-### Step 3 — Creare `Book` come `@Entity`
+### Step 3 — Convertire `Run` da Record a `@Entity`
 
-Sostituisci il modello con una nuova entita `Book` (classe ordinaria, non record), ad esempio in `src/main/java/com/example/library/model/Book.java`:
+Sostituisci il file `Run.java` (o `Run` record) con la classe annotata `@Entity` mostrata nella sezione 2, con:
 
-- `@Entity` e `@Table(name = "books")`
+- `@Entity` e `@Table(name = "runs")`
 - `@Id` e `@GeneratedValue(strategy = GenerationType.IDENTITY)` sul campo `id`
-- `@Column` sui campi principali (`title`, `author`, `pages`)
-- `@Enumerated(EnumType.STRING)` su un campo enum `genre` (es. `TECH`, `FICTION`, `HISTORY`)
-- Costruttore no-arg `protected Book() {}`
+- `@Column` su ogni campo
+- `@Enumerated(EnumType.STRING)` sul campo `location`
+- Costruttore no-arg `protected Run() {}`
 - Costruttore completo con validazione
 - Getter e setter per tutti i campi
 
 ---
 
-### Step 4 — Creare `BookRepository`
+### Step 4 — Creare `RunRepository`
 
-Crea il file `src/main/java/com/example/library/repository/BookRepository.java` aggiungendo almeno 6 funzioni query a tua scelta e fantasia:
+Crea il file `src/main/java/com/example/run/repository/RunRepository.java`:
 
 ```java
+package com.example.run.repository;
+
+import com.example.run.model.Run;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
 @Repository
-public interface BookRepository extends JpaRepository<Book, Integer> {
+public interface RunRepository extends JpaRepository<Run, Integer> {
     // Spring genera l'implementazione automaticamente
 }
 ```
 
 ---
 
-### Step 5 — Crea `BookController`
+### Step 5 — Aggiornare `RunController`
 
-Aggiorna (o crea) `BookController` scrivendo tutti gli EndPoint necessari (a tua discrezione)
+Aggiorna `RunController` per usare `RunRepository` al posto della lista in memoria:
+
+1. Rimuovi il campo `private final List<Run> runs = ...`
+2. Aggiungi il campo `private final RunRepository runRepository`
+3. Inietta `RunRepository` tramite costruttore
+4. Aggiorna i metodi esistenti (`findAll`, `findById`) per usare il repository
+5. Aggiungi i metodi `create`, `update`, `delete` come mostrato nella sezione 3
 
 ---
 
 ### Step 6 — Creare `data.sql` con dati iniziali
 
-Crea il file `src/main/resources/data.sql` e inseriscilo nella cartella resource (attento al file application.properties)
+Crea il file `src/main/resources/data.sql`:
+
+```sql
+INSERT INTO runs (title, started_on, completed_on, miles, location)
+VALUES ('Corsa mattutina', '2024-03-01 07:00:00', '2024-03-01 07:45:00', 5.0, 'OUTDOOR');
+
+INSERT INTO runs (title, started_on, completed_on, miles, location)
+VALUES ('Allenamento indoor', '2024-03-02 18:00:00', '2024-03-02 18:30:00', 3.1, 'INDOOR');
+```
 
 ---
 
@@ -788,62 +1142,63 @@ Crea il file `src/main/resources/data.sql` e inseriscilo nella cartella resource
 
 Avvia l'applicazione con `./mvnw spring-boot:run` e verifica nella console che Hibernate abbia creato la tabella.
 
-**Test 1 — GET /api/books (lista tutti i libri)**
+**Test 1 — GET /api/runs (lista tutte le corse)**
 
 - Metodo: `GET`
-- URL: `http://localhost:8080/api/books`
-- Risultato atteso: array JSON con i 2 libri del `data.sql`
+- URL: `http://localhost:8080/api/runs`
+- Risultato atteso: array JSON con le 2 corse del `data.sql`
 
-**Test 2 — GET /api/books/{id} (singolo libro)**
+**Test 2 — GET /api/runs/{id} (singola corsa)**
 
 - Metodo: `GET`
-- URL: `http://localhost:8080/api/books/1`
-- Risultato atteso: oggetto JSON con il primo libro
-- Bonus: prova con un ID inesistente (es. `/api/books/999`) — dovresti ricevere `404 Not Found`
+- URL: `http://localhost:8080/api/runs/1`
+- Risultato atteso: oggetto JSON con la prima corsa
+- Bonus: prova con un ID inesistente (es. `/api/runs/999`) — dovresti ricevere `404 Not Found`
 
-**Test 3 — POST /api/books (crea nuovo libro)**
+**Test 3 — POST /api/runs (crea nuova corsa)**
 
 - Metodo: `POST`
-- URL: `http://localhost:8080/api/books`
+- URL: `http://localhost:8080/api/runs`
 - Header: `Content-Type: application/json`
 - Body (JSON raw):
 
 ```json
 {
-    "title": "Effective Java",
-    "author": "Joshua Bloch",
-    "pages": 416,
-    "genre": "TECH"
+  "title": "Corsa serale",
+  "startedOn": "2024-03-10T19:00:00",
+  "completedOn": "2024-03-10T19:40:00",
+  "miles": 4.5,
+  "location": "OUTDOOR"
 }
 ```
 
 - Risultato atteso: `201 Created` con l'oggetto creato (campo `id` valorizzato dal DB)
 
-**Test 4 — PUT /api/books/{id} (aggiorna)**
+**Test 4 — PUT /api/runs/{id} (aggiorna)**
 
 - Metodo: `PUT`
-- URL: `http://localhost:8080/api/books/1`
+- URL: `http://localhost:8080/api/runs/1`
 - Header: `Content-Type: application/json`
-- Body: stessa struttura del POST, con valori modificati (es. `"pages": 500`)
+- Body: stessa struttura del POST, con valori modificati (es. `"miles": 6.0`)
 - Risultato atteso: `200 OK` con i dati aggiornati
 
-**Test 5 — DELETE /api/books/{id} (elimina)**
+**Test 5 — DELETE /api/runs/{id} (elimina)**
 
 - Metodo: `DELETE`
-- URL: `http://localhost:8080/api/books/2`
+- URL: `http://localhost:8080/api/runs/2`
 - Risultato atteso: `204 No Content` (nessun body)
-- Verifica: esegui GET /api/books — il libro con id 2 non deve più essere presente
+- Verifica: esegui GET /api/runs — la corsa con id 2 non deve più essere presente
 
 ---
 
 ### Step 8 — Verificare con H2 Console
 
 1. Apri `http://localhost:8080/h2-console` nel browser
-2. Connettiti con JDBC URL `jdbc:h2:mem:librarydb`, username `sa`, password vuota
+2. Connettiti con JDBC URL `jdbc:h2:mem:rundb`, username `sa`, password vuota
 3. Esegui:
 
 ```sql
-SELECT * FROM books;
+SELECT * FROM runs;
 ```
 
 Verifica che le righe corrispondano allo stato attuale del database dopo le operazioni Postman.
@@ -854,7 +1209,7 @@ Verifica che le righe corrispondano allo stato attuale del database dopo le oper
 
 1. Cosa succede al contenuto del database se riavvii l'applicazione con `ddl-auto=create-drop`? E con `ddl-auto=update`?
 2. Perché `JpaRepository` usa `Optional<T>` nel metodo `findById()` invece di restituire direttamente `T`?
-3. Come fa Spring Data JPA a sapere quale SQL generare per il metodo `findByPagesGreaterThan(int pages)` senza che tu scriva alcuna query?
+3. Come fa Spring Data JPA a sapere quale SQL generare per il metodo `findByMilesGreaterThan(double miles)` senza che tu scriva alcuna query?
 4. Qual è la differenza tra `save()` applicato a un'entità senza `id` e `save()` applicato a un'entità con `id` già esistente?
 5. Perché un'entità JPA non può essere un `record` Java?
 
@@ -874,5 +1229,11 @@ Verifica che le righe corrispondano allo stato attuale del database dopo le oper
 | Query personalizzata      | `@Query("SELECT r FROM Run r WHERE ...")`| JPQL o SQL nativo esplicito                     |
 | Configurazione DB         | `application.properties`              | Datasource, ddl-auto, show-sql, H2 console         |
 | Dati iniziali             | `data.sql`                             | SQL eseguito all'avvio per popolare il DB          |
+| Relazione molti→uno       | `@ManyToOne` + `@JoinColumn`           | FK nel lato "molti", punta all'entità padre        |
+| Relazione uno→molti       | `@OneToMany(mappedBy = "...")`         | Collection nel lato "uno", lato inverso            |
+| Relazione uno a uno       | `@OneToOne` + `@JoinColumn`            | FK univoca, lato dipendente                        |
+| Relazione molti a molti   | `@ManyToMany` + `@JoinTable`           | Tabella di join intermedia generata da Hibernate   |
+| Caricamento dati          | `FetchType.LAZY` / `EAGER`             | Lazy: su richiesta; Eager: subito nella query      |
+| Propagazione operazioni   | `CascadeType.ALL` / `PERSIST` / ecc.  | Operazioni JPA propagate automaticamente ai figli  |
 
-> 🎯 **Passaggio chiave del giorno:** si abbandona la lista in memoria e si adotta una soluzione di persistenza reale. Da questo momento, i dati sopravvivono alle chiamate HTTP e — con `ddl-auto=update` — anche ai riavvii dell'applicazione.
+> **Passaggio chiave del giorno:** si abbandona la lista in memoria e si adotta una soluzione di persistenza reale. Da questo momento, i dati sopravvivono alle chiamate HTTP e — con `ddl-auto=update` — anche ai riavvii dell'applicazione.
